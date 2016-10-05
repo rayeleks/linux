@@ -45,4 +45,14 @@ config SX9500
 	  To compile this driver as a module, choose M here: the
 	  module will be called sx9500.
 
+config USRM_HUB
+	tristate "Luftronix ultrasonic ranging modules hub"
+	depends on I2C
+	help
+	  Say Y to build a driver for Luftronix ultrasonic ranging
+	  modules hub.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called usrm_hub.
+
 endmenu

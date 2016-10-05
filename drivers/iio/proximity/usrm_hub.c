@@ -105,13 +105,23 @@ static const struct i2c_device_id usrm_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, usrm_id);
 
+#ifdef CONFIG_OF
+static const struct of_device_id usrm_of_id[] = {
+		{ .compatible = "luftronix,usrm_hub" },
+		{ }
+};
+MODULE_DEVICE_TABLE(of, usrm_of_id);
+#endif
+
 static struct i2c_driver usrm_driver = {
 	.driver.name	= "usrm_hub",
+	.driver.of_match_table = of_match_ptr(usrm_of_id),
 	.probe		= usrm_probe,
 	.id_table	= usrm_id,
 };
 
 module_i2c_driver(usrm_driver);
+
 MODULE_DESCRIPTION("Luftronix Ultrasonic Ranging Modules Hub");
 MODULE_AUTHOR("Volodymyr Yerashok <Volodymyr.Yerashok@eleks.com>");
 MODULE_LICENSE("GPL");

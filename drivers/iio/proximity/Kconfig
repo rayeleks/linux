@@ -47,6 +47,8 @@ config SX9500
 
 config USRM_HUB
 	tristate "Luftronix ultrasonic ranging modules hub"
+	select IIO_BUFFER
+	select IIO_TRIGGERED_BUFFER
 	depends on I2C
 	help
 	  Say Y to build a driver for Luftronix ultrasonic ranging

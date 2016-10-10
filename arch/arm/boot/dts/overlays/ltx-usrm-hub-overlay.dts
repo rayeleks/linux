@@ -27,11 +27,11 @@
 			usrm_hub: usrm_hub@63 {
 				compatible = "luftronix,usrm_hub";
 				reg = <0x63>;
-				gpio-controller;
-				#gpio-cells = <2>;
-				#interrupt-cells=<2>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&usrm_hub_pins>;
 				interrupt-parent = <&gpio>;
 				interrupts = <4 2>;		/* GPIO BCM4, 2 = high-to-low edge triggered */
+				status = "okay";
 			};
 		};
 	};

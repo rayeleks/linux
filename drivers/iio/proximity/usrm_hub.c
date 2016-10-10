@@ -10,6 +10,9 @@
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
 #include <linux/iio/buffer.h>
+#include <linux/iio/trigger.h>
+#include <linux/iio/triggered_buffer.h>
+#include <linux/iio/trigger_consumer.h>
 
 
 #define CHAN_COUNT		( 8 )
@@ -54,7 +57,7 @@ static irqreturn_t usrm_trigger_handler(int irq, void *private)
 	struct i2c_client **client = iio_priv(indio_dev);
 	u8 rxData[CHAN_COUNT * 2];
 	u8 buffer[CHAN_COUNT * 2 + sizeof(s64)];	// Data plus timestamp.
-	int val, bit, ret, i = 0;
+	int bit, ret, i = 0;
 
 //	mutex_lock(&data->mutex);
 
@@ -70,7 +73,6 @@ static irqreturn_t usrm_trigger_handler(int irq, void *private)
 		iio_push_to_buffers_with_timestamp(indio_dev, buffer, pf->timestamp);
 	}
 
-out:
 //	mutex_unlock(&data->mutex);
 
 	iio_trigger_notify_done(indio_dev->trig);
@@ -166,6 +168,8 @@ static int usrm_remove(struct i2c_client *client)
 
 	iio_device_unregister(indio_dev);
 	iio_triggered_buffer_cleanup(indio_dev);
+
+	return 0;
 }
 
 static const struct i2c_device_id usrm_id[] = {

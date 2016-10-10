@@ -15,20 +15,29 @@
 #include <linux/iio/trigger_consumer.h>
 
 
+#define USRM_DRIVER_NAME	"usrm_hub"
+#define USRM_IRQ_NAME		"usrm_event"
+
 #define CHAN_COUNT		( 8 )
+
+
+struct usrm_data {
+	struct i2c_client *client;
+	struct iio_trigger *trig;
+};
 
 
 static int usrm_read_raw(struct iio_dev *indio_dev,
 			   struct iio_chan_spec const *chan, int *val,
 			   int *val2, long mask)
 {
-	struct i2c_client **client = iio_priv(indio_dev);
+	struct usrm_data *data = iio_priv(indio_dev);
 	u8 rxData[CHAN_COUNT * 2];
 	int ret;
 
 	switch (mask) {
 	case IIO_CHAN_INFO_PROCESSED:
-		ret = i2c_smbus_read_i2c_block_data(*client, 0, CHAN_COUNT * 2, rxData);
+		ret = i2c_smbus_read_i2c_block_data(data->client, 0, CHAN_COUNT * 2, rxData);
 		if (ret < 0)
 			return ret;
 		if (chan->channel >= 0 && chan->channel < CHAN_COUNT) {
@@ -54,14 +63,14 @@ static irqreturn_t usrm_trigger_handler(int irq, void *private)
 {
 	struct iio_poll_func *pf = private;
 	struct iio_dev *indio_dev = pf->indio_dev;
-	struct i2c_client **client = iio_priv(indio_dev);
+	struct usrm_data *data = iio_priv(indio_dev);
 	u8 rxData[CHAN_COUNT * 2];
 	u8 buffer[CHAN_COUNT * 2 + sizeof(s64)];	// Data plus timestamp.
 	int bit, ret, i = 0;
 
 //	mutex_lock(&data->mutex);
 
-	ret = i2c_smbus_read_i2c_block_data(*client, 0, CHAN_COUNT * 2, rxData);
+	ret = i2c_smbus_read_i2c_block_data(data->client, 0, CHAN_COUNT * 2, rxData);
 	if (ret >= 0) {
 
 		for_each_set_bit(bit, indio_dev->active_scan_mask, indio_dev->masklength) {
@@ -120,44 +129,84 @@ static int usrm_probe(
 		const struct i2c_device_id *id)
 {
 	struct iio_dev *indio_dev;
-	struct i2c_client **data;
+	struct usrm_data *data;
 	int result;
 
-	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_I2C_BLOCK))
+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_I2C_BLOCK)) {
+		dev_err(&client->dev, "required i2c bus functionality not supported\n");
 		return -ENOSYS;
+	}
 
 	indio_dev = devm_iio_device_alloc(&client->dev, sizeof(*data));
-	if (!indio_dev)
+	if (!indio_dev) {
+		dev_err(&client->dev, "devm_iio_device_alloc() failed\n");
 		return -ENOMEM;
+	}
 
 	data = iio_priv(indio_dev);
-	*data = client;
+	data->client = client;
 
 	indio_dev->dev.parent = &client->dev;
-	indio_dev->name = dev_name(&client->dev);
+	indio_dev->name = USRM_DRIVER_NAME;
 	indio_dev->modes = INDIO_BUFFER_TRIGGERED;
 	indio_dev->info = &usrm_info;
 	indio_dev->channels = usrm_channels;
 	indio_dev->num_channels = ARRAY_SIZE(usrm_channels);
 	i2c_set_clientdata(client, indio_dev);
 
+	if (client->irq <= 0)
+		dev_warn(&client->dev, "no valid irq found\n");
+	else {
+		dev_dbg(&client->dev, "client irq = %d\n", client->irq);
+		result = devm_request_irq(&client->dev, client->irq,
+				iio_trigger_generic_data_rdy_poll,
+				IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+				USRM_IRQ_NAME, indio_dev);
+		if (result < 0) {
+			dev_err(&client->dev, "devm_request_irq() error %d\n", result);
+			return result;
+		}
+
+		data->trig = devm_iio_trigger_alloc(&client->dev, "%s-dev%d",
+				indio_dev->name, indio_dev->id);
+		if (!data->trig) {
+			dev_err(&client->dev, "devm_iio_trigger_alloc() failed\n");
+			return -ENOMEM;
+		}
+
+		data->trig->dev.parent = &client->dev;
+		data->trig->ops = NULL;
+		iio_trigger_set_drvdata(data->trig, indio_dev);
+
+		result = iio_trigger_register(data->trig);
+		if (result) {
+			dev_err(&client->dev, "iio_trigger_register() error %d\n", result);
+			return result;
+		}
+	}
+
 	result = iio_triggered_buffer_setup(indio_dev, iio_pollfunc_store_time,
 			usrm_trigger_handler, NULL);
 
-	if (result) {
-		dev_err(&client->dev, "configure buffer fail %d\n", result);
-		return result;
-	}
-
-	result = iio_device_register(indio_dev);
 	if (result == 0) {
-		return 0;
+
+		result = iio_device_register(indio_dev);
+		if (result == 0) {
+			return 0;
+		}
+		else {
+			dev_err(&client->dev, "iio_device_register() error %d\n", result);
+		}
+
+		iio_triggered_buffer_cleanup(indio_dev);
+
 	}
 	else {
-		dev_err(&client->dev, "IIO register fail %d\n", result);
+		dev_err(&client->dev, "iio_triggered_buffer_setup() error %d\n", result);
 	}
 
-	iio_triggered_buffer_cleanup(indio_dev);
+	if (client->irq > 0)
+		iio_trigger_unregister(data->trig);
 
 	return result;
 }
@@ -165,9 +214,13 @@ static int usrm_probe(
 static int usrm_remove(struct i2c_client *client)
 {
 	struct iio_dev *indio_dev = i2c_get_clientdata(client);
+	struct usrm_data *data = iio_priv(indio_dev);
 
 	iio_device_unregister(indio_dev);
 	iio_triggered_buffer_cleanup(indio_dev);
+	if (client->irq > 0) {
+		iio_trigger_unregister(data->trig);
+	}
 
 	return 0;
 }

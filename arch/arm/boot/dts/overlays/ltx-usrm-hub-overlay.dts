@@ -7,6 +7,17 @@
 	compatible = "brcm,bcm2835", "brcm,bcm2708", "brcm,bcm2709";
 
 	fragment@0 {
+		target = <&gpio>;
+		__overlay__ {
+			usrm_hub_pins: usrm_hub_pins {
+				brcm,pins = <4>;		/* GPIO BCM4 */
+				brcm,function = <0>;	/* GPIO in */
+			};
+		};
+	};
+
+
+	fragment@1 {
 		target = <&i2c_arm>;
 		__overlay__ {
 			#address-cells = <1>;
@@ -16,11 +27,18 @@
 			usrm_hub: usrm_hub@63 {
 				compatible = "luftronix,usrm_hub";
 				reg = <0x63>;
+				gpio-controller;
+				#gpio-cells = <2>;
+				#interrupt-cells=<2>;
+				interrupt-parent = <&gpio>;
+				interrupts = <4 2>;		/* GPIO BCM4, 2 = high-to-low edge triggered */
 			};
 		};
 	};
 	
 	__overrides__ {
+		gpiopin = <&usrm_hub_pins>,"brcm,pins:0",
+				<&usrm_hub>,"interrupts:0";
 		addr = <&usrm_hub>,"reg:0";
 	};
 };

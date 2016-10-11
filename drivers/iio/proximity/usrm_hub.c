@@ -16,7 +16,7 @@
 
 
 #define USRM_DRIVER_NAME	"usrm_hub"
-#define USRM_IRQ_NAME		"usrm_event"
+#define USRM_IRQ_NAME		"usrm_irq"
 
 #define CHAN_COUNT		( 8 )
 
@@ -89,6 +89,11 @@ static irqreturn_t usrm_trigger_handler(int irq, void *private)
 	return IRQ_HANDLED;
 }
 
+static int usrm_set_trigger_state(struct iio_trigger *trig, bool state)
+{
+	return 0;
+}
+
 #define USRM_CHAN(_channel, _si)	\
 		{							\
 			.type = IIO_DISTANCE,	\
@@ -122,6 +127,11 @@ static const struct iio_chan_spec usrm_channels[] = {
 static const struct iio_info usrm_info = {
 	.read_raw = usrm_read_raw,
 	.driver_module = THIS_MODULE,
+};
+
+static const struct iio_trigger_ops usrm_trigger_ops = {
+	.owner = THIS_MODULE,
+	.set_trigger_state = &usrm_set_trigger_state,	
 };
 
 static int usrm_probe(
@@ -159,9 +169,9 @@ static int usrm_probe(
 	else {
 		dev_dbg(&client->dev, "client irq = %d\n", client->irq);
 		result = devm_request_irq(&client->dev, client->irq,
-				iio_trigger_generic_data_rdy_poll,
-				IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-				USRM_IRQ_NAME, indio_dev);
+				&iio_trigger_generic_data_rdy_poll,
+				IRQF_TRIGGER_FALLING,
+				USRM_IRQ_NAME, data->trig);
 		if (result < 0) {
 			dev_err(&client->dev, "devm_request_irq() error %d\n", result);
 			return result;
@@ -175,7 +185,7 @@ static int usrm_probe(
 		}
 
 		data->trig->dev.parent = &client->dev;
-		data->trig->ops = NULL;
+		data->trig->ops =&usrm_trigger_ops;
 		iio_trigger_set_drvdata(data->trig, indio_dev);
 
 		result = iio_trigger_register(data->trig);

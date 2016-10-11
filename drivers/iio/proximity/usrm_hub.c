@@ -24,6 +24,7 @@
 struct usrm_data {
 	struct i2c_client *client;
 	struct iio_trigger *trig;
+	bool trigger_enabled;
 };
 
 
@@ -59,6 +60,18 @@ static int usrm_read_raw(struct iio_dev *indio_dev,
 	return -EINVAL;
 }
 
+static irqreturn_t usrm_irq_handler(int irq, void *private)
+{
+	struct iio_dev *indio_dev = private;
+	struct usrm_data *data = iio_priv(indio_dev);
+
+	if (data->trigger_enabled) {
+		iio_trigger_poll(data->trig);
+	}
+
+	return IRQ_HANDLED;
+}
+
 static irqreturn_t usrm_trigger_handler(int irq, void *private)
 {
 	struct iio_poll_func *pf = private;
@@ -91,6 +104,13 @@ static irqreturn_t usrm_trigger_handler(int irq, void *private)
 
 static int usrm_set_trigger_state(struct iio_trigger *trig, bool state)
 {
+	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
+	struct usrm_data *data = iio_priv(indio_dev);
+
+	data->trigger_enabled = state;
+
+	dev_dbg(&data->client->dev, "%s trigger set state = %d\n", trig->name, data->trigger_enabled);
+
 	return 0;
 }
 
@@ -155,6 +175,7 @@ static int usrm_probe(
 
 	data = iio_priv(indio_dev);
 	data->client = client;
+	data->trigger_enabled = false;
 
 	indio_dev->dev.parent = &client->dev;
 	indio_dev->name = USRM_DRIVER_NAME;
@@ -169,9 +190,9 @@ static int usrm_probe(
 	else {
 		dev_dbg(&client->dev, "client irq = %d\n", client->irq);
 		result = devm_request_irq(&client->dev, client->irq,
-				&iio_trigger_generic_data_rdy_poll,
+				usrm_irq_handler,
 				IRQF_TRIGGER_FALLING,
-				USRM_IRQ_NAME, data->trig);
+				USRM_IRQ_NAME, indio_dev);
 		if (result < 0) {
 			dev_err(&client->dev, "devm_request_irq() error %d\n", result);
 			return result;

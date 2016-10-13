@@ -62,6 +62,7 @@ static int usrm_read_raw(struct iio_dev *indio_dev,
 
 static irqreturn_t usrm_irq_handler(int irq, void *private)
 {
+
 	struct iio_dev *indio_dev = private;
 	struct usrm_data *data = iio_priv(indio_dev);
 
@@ -82,6 +83,8 @@ static irqreturn_t usrm_trigger_handler(int irq, void *private)
 	int bit, ret, i = 0;
 
 //	mutex_lock(&data->mutex);
+
+	dev_dbg(&indio_dev->dev, "active_scan_mask = %lu, masklength = %u\n", *indio_dev->active_scan_mask, indio_dev->masklength);
 
 	ret = i2c_smbus_read_i2c_block_data(data->client, 0, CHAN_COUNT * 2, rxData);
 	if (ret >= 0) {
@@ -108,8 +111,6 @@ static int usrm_set_trigger_state(struct iio_trigger *trig, bool state)
 	struct usrm_data *data = iio_priv(indio_dev);
 
 	data->trigger_enabled = state;
-
-	dev_dbg(&data->client->dev, "%s trigger set state = %d\n", trig->name, data->trigger_enabled);
 
 	return 0;
 }
@@ -189,10 +190,8 @@ static int usrm_probe(
 		dev_warn(&client->dev, "no valid irq found\n");
 	else {
 		dev_dbg(&client->dev, "client irq = %d\n", client->irq);
-		result = devm_request_irq(&client->dev, client->irq,
-				usrm_irq_handler,
-				IRQF_TRIGGER_FALLING,
-				USRM_IRQ_NAME, indio_dev);
+		result = devm_request_irq(&client->dev, client->irq, usrm_irq_handler,
+				0, USRM_IRQ_NAME, indio_dev);
 		if (result < 0) {
 			dev_err(&client->dev, "devm_request_irq() error %d\n", result);
 			return result;

@@ -10,7 +10,7 @@
 		target = <&gpio>;
 		__overlay__ {
 			mpu6050_irq_pin: mpu6050_irq_pin {
-				brcm,pins = <17>;		/* GPIO BCM17 */
+				brcm,pins = <4>;		/* GPIO BCM4 */
 				brcm,function = <0>;	/* GPIO in */
 			};
 		};
@@ -30,7 +30,7 @@
 				pinctrl-names = "default";
 				pinctrl-0 = <&mpu6050_irq_pin>;
 				interrupt-parent = <&gpio>;
-				interrupts = <17 1>;		/* GPIO BCM17, 1 = low-to-high edge triggered */
+				interrupts = <4 1>;		/* GPIO BCM4, 1 = low-to-high edge triggered */
 				status = "okay";
 			};
 		};

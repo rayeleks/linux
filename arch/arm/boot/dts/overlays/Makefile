@@ -51,6 +51,7 @@ dtbo-$(RPI_DT_OVERLAYS) += iqaudio-digi-wm8804-audio.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += justboom-dac.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += justboom-digi.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += lirc-rpi.dtbo
+dtbo-$(RPI_DT_OVERLAYS) += ltx-mpu6050.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += ltx-usrm-hub.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += mcp23017.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += mcp23s17.dtbo

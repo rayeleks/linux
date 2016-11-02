@@ -22,6 +22,7 @@
 
 
 struct usrm_data {
+	struct mutex mutex;
 	struct i2c_client *client;
 	struct iio_trigger *trig;
 	bool trigger_enabled;
@@ -38,7 +39,10 @@ static int usrm_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_PROCESSED:
+		memset(rxData, 0, sizeof(rxData));
+		mutex_lock(&data->mutex);
 		ret = i2c_smbus_read_i2c_block_data(data->client, 0, CHAN_COUNT * 2, rxData);
+		mutex_unlock(&data->mutex);
 		if (ret < 0)
 			return ret;
 		if (chan->channel >= 0 && chan->channel < CHAN_COUNT) {
@@ -82,9 +86,11 @@ static irqreturn_t usrm_trigger_handler(int irq, void *private)
 	u8 buffer[CHAN_COUNT * 2 + sizeof(s64)];	// Data plus timestamp.
 	int bit, ret, i = 0;
 
-//	mutex_lock(&data->mutex);
-
 	dev_dbg(&indio_dev->dev, "active_scan_mask = %lu, masklength = %u\n", *indio_dev->active_scan_mask, indio_dev->masklength);
+
+	memset(rxData, 0, sizeof(rxData));
+
+	mutex_lock(&data->mutex);
 
 	ret = i2c_smbus_read_i2c_block_data(data->client, 0, CHAN_COUNT * 2, rxData);
 	if (ret >= 0) {
@@ -98,7 +104,7 @@ static irqreturn_t usrm_trigger_handler(int irq, void *private)
 		iio_push_to_buffers_with_timestamp(indio_dev, buffer, pf->timestamp);
 	}
 
-//	mutex_unlock(&data->mutex);
+	mutex_unlock(&data->mutex);
 
 	iio_trigger_notify_done(indio_dev->trig);
 
@@ -115,14 +121,14 @@ static int usrm_set_trigger_state(struct iio_trigger *trig, bool state)
 	return 0;
 }
 
-#define USRM_CHAN(_channel, _si)	\
+#define USRM_CHAN(_channel)	\
 		{							\
 			.type = IIO_DISTANCE,	\
 			.indexed = 1,			\
 			.channel = _channel,	\
 			.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),			\
 			.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
-			.scan_index = _si,			\
+			.scan_index = _channel,			\
 			.scan_type = {					\
 					.sign = 'u',			\
 					.realbits = 16,			\
@@ -134,15 +140,15 @@ static int usrm_set_trigger_state(struct iio_trigger *trig, bool state)
 
 
 static const struct iio_chan_spec usrm_channels[] = {
-		IIO_CHAN_SOFT_TIMESTAMP(0),
-		USRM_CHAN(0, 1),
-		USRM_CHAN(1, 2),
-		USRM_CHAN(2, 3),
-		USRM_CHAN(3, 4),
-		USRM_CHAN(4, 5),
-		USRM_CHAN(5, 6),
-		USRM_CHAN(6, 7),
-		USRM_CHAN(7, 8)
+		USRM_CHAN(0),
+		USRM_CHAN(1),
+		USRM_CHAN(2),
+		USRM_CHAN(3),
+		USRM_CHAN(4),
+		USRM_CHAN(5),
+		USRM_CHAN(6),
+		USRM_CHAN(7),
+		IIO_CHAN_SOFT_TIMESTAMP(8)
 };
 
 static const struct iio_info usrm_info = {
@@ -176,6 +182,7 @@ static int usrm_probe(
 
 	data = iio_priv(indio_dev);
 	data->client = client;
+	mutex_init(&data->mutex);
 	data->trigger_enabled = false;
 
 	indio_dev->dev.parent = &client->dev;

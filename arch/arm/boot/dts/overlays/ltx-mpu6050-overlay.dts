@@ -1,0 +1,45 @@
+// Device tree overlay for MPU6050.
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835", "brcm,bcm2708", "brcm,bcm2709";
+
+	fragment@0 {
+		target = <&gpio>;
+		__overlay__ {
+			mpu6050_irq_pin: mpu6050_irq_pin {
+				brcm,pins = <17>;		/* GPIO BCM17 */
+				brcm,function = <0>;	/* GPIO in */
+			};
+		};
+	};
+
+
+	fragment@1 {
+		target = <&i2c_arm>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			mpu6050: mpu6050@68 {
+				compatible = "invensense,mpu6050";
+				reg = <0x68>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&mpu6050_irq_pin>;
+				interrupt-parent = <&gpio>;
+				interrupts = <17 1>;		/* GPIO BCM17, 1 = low-to-high edge triggered */
+				status = "okay";
+			};
+		};
+	};
+	
+	__overrides__ {
+		gpiopin = <&mpu6050_irq_pin>,"brcm,pins:0",
+				<&mpu6050>,"interrupts:0";
+		addr = <&mpu6050>,"reg:0";
+	};
+};
+

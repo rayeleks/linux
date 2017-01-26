@@ -42,6 +42,9 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
 	justboom-dac.dtbo \
 	justboom-digi.dtbo \
 	lirc-rpi.dtbo \
+	ltx-mpu6000.dtbo \
+	ltx-mpu6050.dtbo \
+	ltx-usrm-hub.dtbo \
 	mcp23017.dtbo \
 	mcp23s17.dtbo \
 	mcp2515-can0.dtbo \

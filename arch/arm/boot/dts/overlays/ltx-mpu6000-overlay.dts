@@ -1,0 +1,53 @@
+// Device tree overlay for MPU6000.
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835", "brcm,bcm2708", "brcm,bcm2709";
+	
+    /* disable spi-dev for spi0.0 */
+    fragment@0 {
+		target = <&spidev0>;
+		__overlay__ {
+			status = "disabled";
+		};
+    };
+
+	fragment@1 {
+		target = <&gpio>;
+		__overlay__ {
+			mpu6000_irq_pin: mpu6000_irq_pin {
+				brcm,pins = <22>;		/* GPIO BCM22 */
+				brcm,function = <0>;	/* GPIO in */
+			};
+		};
+	};
+
+
+	fragment@2 {
+		target = <&spi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			mpu6000: mpu6000@0 {
+				compatible = "invensense,mpu6000";
+				reg = <0>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&mpu6000_irq_pin>;
+				interrupt-parent = <&gpio>;
+				interrupts = <22 1>;		/* GPIO BCM22, 1 = low-to-high edge triggered */
+				spi-max-frequency = <1000000>;
+				status = "okay";
+			};
+		};
+	};
+	
+	__overrides__ {
+		gpiopin = <&mpu6000_irq_pin>,"brcm,pins:0",<&mpu6000>,"interrupts:0";
+		addr = <&mpu6000>,"reg:0";
+	};
+};
+

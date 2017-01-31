@@ -38,6 +38,8 @@ static const int gyro_scale_6050[] = {133090, 266181, 532362, 1064724};
  */
 static const int accel_scale[] = {598, 1196, 2392, 4785};
 
+static const int lpf_freq[] = {256, 188, 98, 42, 20, 10, 5, 2100};
+
 static const struct inv_mpu6050_reg_map reg_set_6500 = {
 	.sample_rate_div	= INV_MPU6050_REG_SAMPLE_RATE_DIV,
 	.lpf                    = INV_MPU6050_REG_CONFIG,
@@ -532,26 +534,45 @@ error_write_raw:
  *                  correct low pass parameters based on the fifo rate, e.g,
  *                  sampling frequency.
  */
-static int inv_mpu6050_set_lpf(struct inv_mpu6050_state *st, int rate)
+//static int inv_mpu6050_set_lpf(struct inv_mpu6050_state *st, int rate)
+//{
+//	const int hz[] = {188, 98, 42, 20, 10, 5};
+//	const int d[] = {INV_MPU6050_FILTER_188HZ, INV_MPU6050_FILTER_98HZ,
+//			INV_MPU6050_FILTER_42HZ, INV_MPU6050_FILTER_20HZ,
+//			INV_MPU6050_FILTER_10HZ, INV_MPU6050_FILTER_5HZ};
+//	int i, h, result;
+//	u8 data;
+//
+//	h = (rate >> 1);
+//	i = 0;
+//	while ((h < hz[i]) && (i < ARRAY_SIZE(d) - 1))
+//		i++;
+//	data = d[i];
+//	result = regmap_write(st->map, st->reg->lpf, data);
+//	if (result)
+//		return result;
+//	st->chip_config.lpf = data;
+//
+//	return 0;
+//}
+
+static int inv_mpu6050_write_lpf_freq(struct inv_mpu6050_state *st, int val)
 {
-	const int hz[] = {188, 98, 42, 20, 10, 5};
-	const int d[] = {INV_MPU6050_FILTER_188HZ, INV_MPU6050_FILTER_98HZ,
-			INV_MPU6050_FILTER_42HZ, INV_MPU6050_FILTER_20HZ,
-			INV_MPU6050_FILTER_10HZ, INV_MPU6050_FILTER_5HZ};
-	int i, h, result;
-	u8 data;
+	int result;
+	unsigned int n;
 
-	h = (rate >> 1);
-	i = 0;
-	while ((h < hz[i]) && (i < ARRAY_SIZE(d) - 1))
-		i++;
-	data = d[i];
-	result = regmap_write(st->map, st->reg->lpf, data);
-	if (result)
-		return result;
-	st->chip_config.lpf = data;
+	for (n = 0; n < ARRAY_SIZE(lpf_freq); ++n) {
+		if (lpf_freq[n] == val) {
+			result = regmap_write(st->map, st->reg->lpf, n);
+			if (result)
+				return result;
 
-	return 0;
+			st->chip_config.lpf = n;
+			return 0;
+		}
+	}
+
+	return -EINVAL;
 }
 
 /**
@@ -590,9 +611,10 @@ inv_mpu6050_fifo_rate_store(struct device *dev, struct device_attribute *attr,
 		goto fifo_rate_fail;
 	st->chip_config.fifo_rate = fifo_rate;
 
-	result = inv_mpu6050_set_lpf(st, fifo_rate);
-	if (result)
-		goto fifo_rate_fail;
+	// In modified driver the LPF frequency is set independent from the sampling rate.
+//	result = inv_mpu6050_set_lpf(st, fifo_rate);
+//	if (result)
+//		goto fifo_rate_fail;
 
 fifo_rate_fail:
 	result |= inv_mpu6050_set_power_itg(st, false);
@@ -613,6 +635,54 @@ inv_fifo_rate_show(struct device *dev, struct device_attribute *attr,
 	struct inv_mpu6050_state *st = iio_priv(dev_to_iio_dev(dev));
 
 	return sprintf(buf, "%d\n", st->chip_config.fifo_rate);
+}
+
+static ssize_t
+inv_mpu6050_lpf_store(struct device *dev, struct device_attribute *attr,
+	    const char *buf, size_t count)
+{
+	s32 freq;
+	int result;
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct inv_mpu6050_state *st = iio_priv(indio_dev);
+
+	if (kstrtoint(buf, 10, &freq))
+		return -EINVAL;
+	if (freq == lpf_freq[st->chip_config.lpf])
+		return count;
+
+	mutex_lock(&indio_dev->mlock);
+	if (st->chip_config.enable) {
+		result = -EBUSY;
+		goto lpf_store_fail;
+	}
+	result = inv_mpu6050_set_power_itg(st, true);
+	if (result)
+		goto lpf_store_fail;
+
+	result = inv_mpu6050_write_lpf_freq(st, freq);
+	if (result)
+		goto lpf_store_fail;
+
+lpf_store_fail:
+	result |= inv_mpu6050_set_power_itg(st, false);
+	mutex_unlock(&indio_dev->mlock);
+	if (result)
+		return result;
+
+	return count;
+}
+
+/**
+ * inv_mpu6050_lpf_show() - Get the current LPF frequency.
+ */
+static ssize_t
+inv_mpu6050_lpf_show(struct device *dev, struct device_attribute *attr,
+		   char *buf)
+{
+	struct inv_mpu6050_state *st = iio_priv(dev_to_iio_dev(dev));
+
+	return sprintf(buf, "%d\n", lpf_freq[st->chip_config.lpf]);
 }
 
 /**
@@ -725,8 +795,13 @@ static IIO_CONST_ATTR(in_anglvel_scale_available,
 					  "0.000133090 0.000266181 0.000532362 0.001064724");
 static IIO_CONST_ATTR(in_accel_scale_available,
 					  "0.000598 0.001196 0.002392 0.004785");
+static IIO_CONST_ATTR(lpf_frequency_available,
+					  "5 10 20 42 98 188 256(no LPF) 2100(no LPF)");
+
 static IIO_DEV_ATTR_SAMP_FREQ(S_IRUGO | S_IWUSR, inv_fifo_rate_show,
 	inv_mpu6050_fifo_rate_store);
+static IIO_DEVICE_ATTR(lpf_frequency, S_IRUGO | S_IWUSR, inv_mpu6050_lpf_show,
+	inv_mpu6050_lpf_store, 0);
 
 /* Deprecated: kept for userspace backward compatibility. */
 static IIO_DEVICE_ATTR(in_gyro_matrix, S_IRUGO, inv_attr_show, NULL,
@@ -738,9 +813,11 @@ static struct attribute *inv_attributes[] = {
 	&iio_dev_attr_in_gyro_matrix.dev_attr.attr,  /* deprecated */
 	&iio_dev_attr_in_accel_matrix.dev_attr.attr, /* deprecated */
 	&iio_dev_attr_sampling_frequency.dev_attr.attr,
+	&iio_dev_attr_lpf_frequency.dev_attr.attr,
 	&iio_const_attr_sampling_frequency_available.dev_attr.attr,
 	&iio_const_attr_in_accel_scale_available.dev_attr.attr,
 	&iio_const_attr_in_anglvel_scale_available.dev_attr.attr,
+	&iio_const_attr_lpf_frequency_available.dev_attr.attr,
 	NULL,
 };
 

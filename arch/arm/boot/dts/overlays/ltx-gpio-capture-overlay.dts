@@ -1,0 +1,39 @@
+// Definitions for ir-gpio module
+/dts-v1/;
+/plugin/;
+
+/ {
+        compatible = "brcm,bcm2708";
+
+        fragment@0 {
+                target-path = "/";
+                __overlay__ {
+                        ltx_gpio_capture: ltx_gpio_capture {
+                                compatible = "luftronix,gpio-capture";
+
+                                // pin number, high or low
+                                gpios = <&gpio 24 1>;
+
+                                status = "okay";
+                        };
+                };
+        };
+
+        fragment@1 {
+                target = <&gpio>;
+                __overlay__ {
+                        ltx_gpio_cap_pins: ltx_gpio_cap_pins {
+                                brcm,pins = <24>;                       /* GPIO BCM24 */
+                                brcm,function = <0>;                    /* GPIO in */
+                                brcm,pull = <2>;                        /* GPIO pull-up */
+                        };
+                };
+        };
+
+        __overrides__ {
+                // parameters
+                gpio_pin = <&ltx_gpio_capture>,"gpios:4",
+                                        <&ltx_gpio_cap_pins>,"brcm,pins:0";  // pin number
+                gpio_pull = <&ltx_gpio_cap_pins>,"brcm,pull:0";              // pull-up/down state
+        };
+};

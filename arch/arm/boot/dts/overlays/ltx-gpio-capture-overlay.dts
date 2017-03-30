@@ -11,8 +11,8 @@
                         ltx_gpio_capture: ltx_gpio_capture {
                                 compatible = "luftronix,gpio-capture";
 
-                                // pin number, high or low
-                                gpios = <&gpio 24 1>;
+                                // pin number, options flag
+                                gpios = <&gpio 24 GPIO_ACTIVE_HIGH>;
 
                                 status = "okay";
                         };

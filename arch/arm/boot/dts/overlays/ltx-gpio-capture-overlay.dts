@@ -12,7 +12,7 @@
                                 compatible = "luftronix,gpio-capture";
 
                                 // pin number, options flag
-                                gpios = <&gpio 24 GPIO_ACTIVE_HIGH>;
+                                gpios = <&gpio 24 0>;
 
                                 status = "okay";
                         };

@@ -8,13 +8,13 @@
         fragment@0 {
                 target-path = "/";
                 __overlay__ {
-                        ltx_gpio_capture_0: ltx_gpio_capture {
+                        ltx_gpio_capture_0: ltx_gpio_capture_0 {
                                 compatible = "luftronix,gpio-capture";
                                 // pin number, options flag
                                 gpios = <&gpio 20 0>;
                                 status = "okay";
                         };
-                        ltx_gpio_capture_1: ltx_gpio_capture {
+                        ltx_gpio_capture_1: ltx_gpio_capture_1 {
                                 compatible = "luftronix,gpio-capture";
                                 // pin number, options flag
                                 gpios = <&gpio 21 0>;

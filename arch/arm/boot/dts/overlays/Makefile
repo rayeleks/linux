@@ -53,6 +53,7 @@ dtbo-$(RPI_DT_OVERLAYS) += justboom-digi.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += lirc-rpi.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += ltx-gpio-capture.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += ltx-gpio-capture2ch.dtbo
+dtbo-$(RPI_DT_OVERLAYS) += ltx-icm20602.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += ltx-mpu6050.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += ltx-usrm-hub.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += mcp23017.dtbo

@@ -1,0 +1,53 @@
+// Device tree overlay for ICM-20602.
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835", "brcm,bcm2708", "brcm,bcm2709";
+
+	fragment@0 {
+		target = <&spidev0>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@1 {
+		target = <&gpio>;
+		__overlay__ {
+			icm20602_irq_pin: icm20602_irq_pin {
+				brcm,pins = <24>;		/* GPIO BCM24 */
+				brcm,function = <0>;	/* GPIO in */
+			};
+		};
+	};
+
+
+	fragment@2 {
+		target = <&spi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			icm20602_spi: icm20602_spi@0 {
+				compatible = "invensense,icm20602";
+				reg = <0>;
+				spi-max-frequency = <2000000>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&icm20602_irq_pin>;
+				interrupt-parent = <&gpio>;
+				interrupts = <24 1>;		/* GPIO BCM24, 1 = low-to-high edge triggered */
+				status = "okay";
+			};
+		};
+	};
+	
+	__overrides__ {
+		gpiopin = <&icm20602_irq_pin>,"brcm,pins:0",
+				<&icm20602_spi>,"interrupts:0";
+		addr = <&icm20602_spi>,"reg:0";
+	};
+};
+

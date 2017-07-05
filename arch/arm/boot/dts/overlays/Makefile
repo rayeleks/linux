@@ -19,6 +19,7 @@ dtbo-$(RPI_DT_OVERLAYS) += at86rf233.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += audioinjector-wm8731-audio.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += audremap.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += bmp085_i2c-sensor.dtbo
+dtbo-$(RPI_DT_OVERLAYS) += bmp280_i2c-sensor.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += dht11.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += dionaudio-loco.dtbo
 dtbo-$(RPI_DT_OVERLAYS) += dpi18.dtbo

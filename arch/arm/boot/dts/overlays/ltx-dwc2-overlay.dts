@@ -1,0 +1,45 @@
+// Definitions DWC-2 Board from Luftronix.
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835", "brcm,bcm2708", "brcm,bcm2709";
+
+	fragment@0 {
+		target = <&gpio>;
+		__overlay__ {
+			dwc2_pins: dwc2_pins {
+				brcm,pins = <4>;		/* GPIO BCM4 */
+				brcm,function = <0>;	/* GPIO in */
+			};
+		};
+	};
+
+
+	fragment@1 {
+		target = <&i2c_arm>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			dwc2: dwc2@60 {
+				compatible = "luftronix,ltx_dwc2";
+				reg = <0x60>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&dwc2_pins>;
+				interrupt-parent = <&gpio>;
+				interrupts = <4 2>;		/* GPIO BCM4, 2 = high-to-low edge triggered */
+				status = "okay";
+			};
+		};
+	};
+	
+	__overrides__ {
+		gpiopin = <&dwc2_pins>,"brcm,pins:0",
+				<&dwc2>,"interrupts:0";
+		addr = <&dwc2>,"reg:0";
+	};
+};
+
